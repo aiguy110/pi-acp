@@ -24,7 +24,7 @@ test('PiAcpSession: emits agent_message_chunk for text_delta', async () => {
     assistantMessageEvent: { type: 'text_delta', delta: 'hi' }
   })
 
-  await new Promise(r => setTimeout(r, 30))
+  await new Promise(r => setTimeout(r, 130))
 
   assert.equal(conn.updates.length, 1)
   assert.equal(conn.updates[0]!.sessionId, 's1')
@@ -52,7 +52,7 @@ test('PiAcpSession: emits agent_thought_chunk for thinking_delta', async () => {
     assistantMessageEvent: { type: 'thinking_delta', delta: 'thinking...' }
   })
 
-  await new Promise(r => setTimeout(r, 30))
+  await new Promise(r => setTimeout(r, 130))
 
   assert.equal(conn.updates.length, 1)
   assert.equal(conn.updates[0]!.sessionId, 's1')
@@ -79,7 +79,7 @@ test('PiAcpSession: coalesces a burst of adjacent text deltas', async () => {
     proc.emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta } })
   }
 
-  await new Promise(r => setTimeout(r, 30))
+  await new Promise(r => setTimeout(r, 130))
 
   assert.equal(conn.updates.length, 1)
   assert.deepEqual(conn.updates[0]!.update, {
@@ -516,7 +516,7 @@ test('PiAcpSession: preserves ordering when auto_retry_start is interleaved with
   proc.emit({ type: 'auto_retry_start', attempt: 1, maxAttempts: 2, delayMs: 2000 } as any)
   proc.emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'after' } })
 
-  await new Promise(r => setTimeout(r, 60))
+  await new Promise(r => setTimeout(r, 220))
 
   assert.deepEqual(
     conn.updates.map(u => u.update),
