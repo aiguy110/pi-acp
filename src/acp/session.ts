@@ -331,7 +331,7 @@ export class PiAcpSession {
   } | null = null
   private deltaFlushTimer: ReturnType<typeof setTimeout> | null = null
 
-  private static readonly deltaFlushMinMs = 20
+  private static readonly deltaFlushMinMs = 100
   private static readonly deltaFlushMaxMs = 250
   private static readonly deltaFlushMaxChars = 16 * 1024
 
