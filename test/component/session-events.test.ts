@@ -672,6 +672,55 @@ test('PiAcpSession: prompt stays open through retry runs until agent_settled', a
   assert.equal(reason, 'end_turn')
 })
 
+test('PiAcpSession: exhausted retries resolve error without agent_settled', async () => {
+  const conn = new FakeAgentSideConnection()
+  const proc = new FakePiRpcProcess()
+  const session = new PiAcpSession({
+    sessionId: 's1',
+    cwd: process.cwd(),
+    mcpServers: [],
+    proc: proc as any,
+    conn: asAgentConn(conn),
+    fileCommands: []
+  })
+
+  const p = session.prompt('hello')
+  proc.emit({ type: 'agent_start' })
+  proc.emit({ type: 'auto_retry_start', attempt: 3, maxAttempts: 3, delayMs: 8000 })
+  proc.emit({ type: 'agent_end', willRetry: false })
+  proc.emit({ type: 'auto_retry_end', success: false, attempt: 3, finalError: '502 status code' } as any)
+
+  assert.equal(await p, 'error')
+  assert.equal(
+    (conn.updates.find(
+      entry =>
+        entry.update.sessionUpdate === 'agent_message_chunk' &&
+        (entry.update as any).content?.text === 'Retries exhausted.'
+    )?.update as any)?.content.text,
+    'Retries exhausted.'
+  )
+})
+
+test('PiAcpSession: agent_settled after exhausted retries resolves error once', async () => {
+  const conn = new FakeAgentSideConnection()
+  const proc = new FakePiRpcProcess()
+  const session = new PiAcpSession({
+    sessionId: 's1',
+    cwd: process.cwd(),
+    mcpServers: [],
+    proc: proc as any,
+    conn: asAgentConn(conn),
+    fileCommands: []
+  })
+
+  const p = session.prompt('hello')
+  proc.emit({ type: 'agent_start' })
+  proc.emit({ type: 'auto_retry_end', success: false, attempt: 3, finalError: '502 status code' } as any)
+  proc.emit({ type: 'agent_settled' })
+
+  assert.equal(await p, 'error')
+})
+
 test('PiAcpSession: does not re-emit startup info on first prompt after it was already sent', async () => {
   const conn = new FakeAgentSideConnection()
   const proc = new FakePiRpcProcess()

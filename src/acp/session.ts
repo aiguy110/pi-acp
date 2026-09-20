@@ -304,6 +304,13 @@ export class PiAcpSession {
   // when retry, compaction, or queued continuations run. The session-level prompt
   // completes only when `agent_settled` is emitted.
   private inAgentLoop = false
+  // Some Pi versions omit `agent_settled` after the final automatic retry
+  // fails. Keep the normal settlement event authoritative when it arrives in
+  // the same event batch, but do not leave the ACP prompt open forever when it
+  // does not.
+  private failedRetrySettlementTimer: ReturnType<typeof setTimeout> | null = null
+  private terminalRetryFailure = false
+  private ignoreUnpairedSettlement = false
 
   // For ACP diff support: capture file contents before edit/write mutations,
   // then emit ToolCallContent {type:"diff"}. Compatible structured edit/write
@@ -462,10 +469,15 @@ export class PiAcpSession {
     // delivered before we resolve the ACP `session/prompt` request.
     await this.publishContextUsage()
 
-    const reason: StopReason = this.cancelRequested ? 'cancelled' : 'end_turn'
+    const reason: StopReason = this.cancelRequested
+      ? 'cancelled'
+      : this.terminalRetryFailure
+        ? 'error'
+        : 'end_turn'
     this.pendingTurn?.resolve(reason)
     this.pendingTurn = null
     this.inAgentLoop = false
+    this.terminalRetryFailure = false
 
     // Start next queued prompt, if any.
     const next = this.turnQueue.shift()
@@ -540,6 +552,7 @@ export class PiAcpSession {
   private startTurn(t: QueuedTurn): void {
     this.cancelRequested = false
     this.inAgentLoop = false
+    this.terminalRetryFailure = false
 
     this.pendingTurn = { resolve: t.resolve, reject: t.reject }
 
@@ -857,8 +870,32 @@ export class PiAcpSession {
       case 'auto_retry_end': {
         this.emit({
           sessionUpdate: 'agent_message_chunk',
-          content: { type: 'text', text: 'Retry finished, resuming.' } satisfies ContentBlock
+          content: {
+            type: 'text',
+            text: (ev as any).success === false ? 'Retries exhausted.' : 'Retry finished, resuming.'
+          } satisfies ContentBlock
         })
+
+        if ((ev as any).success === false && this.pendingTurn) {
+          this.terminalRetryFailure = true
+          if (this.failedRetrySettlementTimer) clearTimeout(this.failedRetrySettlementTimer)
+          this.failedRetrySettlementTimer = setTimeout(() => {
+            this.failedRetrySettlementTimer = null
+            if (!this.pendingTurn || !this.terminalRetryFailure) return
+
+            void this.flushEmits().finally(() => {
+              this.pendingTurn?.resolve(this.cancelRequested ? 'cancelled' : 'error')
+              this.pendingTurn = null
+              this.inAgentLoop = false
+              this.terminalRetryFailure = false
+              this.ignoreUnpairedSettlement = true
+              this.emit({
+                sessionUpdate: 'session_info_update',
+                _meta: { piAcp: { queueDepth: this.turnQueue.length, running: false } }
+              })
+            })
+          }, 0)
+        }
         break
       }
 
@@ -885,6 +922,7 @@ export class PiAcpSession {
       }
 
       case 'agent_start': {
+        this.ignoreUnpairedSettlement = false
         this.inAgentLoop = true
         break
       }
@@ -903,6 +941,14 @@ export class PiAcpSession {
       }
 
       case 'agent_settled': {
+        if (this.ignoreUnpairedSettlement && !this.pendingTurn) {
+          this.ignoreUnpairedSettlement = false
+          break
+        }
+        if (this.failedRetrySettlementTimer) {
+          clearTimeout(this.failedRetrySettlementTimer)
+          this.failedRetrySettlementTimer = null
+        }
         void this.settleTurn()
         break
       }
