@@ -1,6 +1,8 @@
 # Tandem fork of pi-acp
 
-This fork exists so Tandem can show a live context-usage meter for `pi` sessions.
+This fork exists so Tandem can show a live context-usage meter for `pi` sessions
+and deliver streamed output without building up a token-sized ACP notification
+backlog.
 It is tracked by Tandem's ACP fork-tracking system (`tandem acp` — see the
 `acp-server-forks` skill in the Tandem home-base repo).
 
@@ -20,6 +22,14 @@ It is tracked by Tandem's ACP fork-tracking system (`tandem acp` — see the
    not for upstream. npm runs `prepare` (not `prepack`) when installing a git
    dependency; without it `npm install <git-url>#<ref>` yields a package with no
    `dist/`, and Tandem installs this fork straight from a pinned git SHA.
+
+3. **`fix: settle prompts after exhausted retries`** — resolves a prompt when
+   Pi exhausts automatic retries without emitting a final `agent_settled` event.
+
+4. **`fix(acp): adaptively coalesce streaming deltas`** — batches adjacent text
+   and thought deltas before ACP delivery. The batching window grows when the
+   notification queue or observed delivery latency rises, preventing generation
+   from outrunning Tandem's consumer while keeping low-pressure latency small.
 
 ## Rebasing onto a new upstream release
 
