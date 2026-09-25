@@ -747,11 +747,13 @@ test('PiAcpSession: exhausted retries resolve error without agent_settled', asyn
 
   assert.equal(await p, 'error')
   assert.equal(
-    (conn.updates.find(
-      entry =>
-        entry.update.sessionUpdate === 'agent_message_chunk' &&
-        (entry.update as any).content?.text === 'Retries exhausted.'
-    )?.update as any)?.content.text,
+    (
+      conn.updates.find(
+        entry =>
+          entry.update.sessionUpdate === 'agent_message_chunk' &&
+          (entry.update as any).content?.text === 'Retries exhausted.'
+      )?.update as any
+    )?.content.text,
     'Retries exhausted.'
   )
 })
@@ -1203,4 +1205,27 @@ test('PiAcpSession: cancelled turn still reports cancelled after usage publish',
     conn.updates.filter(u => u.update.sessionUpdate === 'usage_update').map(u => u.update),
     [{ sessionUpdate: 'usage_update', used: 42, size: 100 }]
   )
+})
+
+test('PiAcpSession: emits usage_update when an assistant message ends', async () => {
+  const conn = new FakeAgentSideConnection()
+  const proc = new FakePiRpcProcess()
+  proc.sessionStats = { contextUsage: { tokens: 42_000, contextWindow: 98_304 } }
+
+  new PiAcpSession({
+    sessionId: 's1',
+    cwd: process.cwd(),
+    mcpServers: [],
+    proc: proc as any,
+    conn: asAgentConn(conn),
+    fileCommands: []
+  })
+
+  proc.emit({ type: 'message_end', message: { role: 'user' } } as any)
+  proc.emit({ type: 'message_end', message: { role: 'assistant' } } as any)
+  await new Promise(r => setTimeout(r, 0))
+
+  const updates = conn.updates.filter(u => u.update.sessionUpdate === 'usage_update')
+  assert.equal(updates.length, 1)
+  assert.deepEqual(updates[0]!.update, { sessionUpdate: 'usage_update', used: 42_000, size: 98_304 })
 })

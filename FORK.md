@@ -13,23 +13,28 @@ It is tracked by Tandem's ACP fork-tracking system (`tandem acp` — see the
 
 ## Carried commits
 
-1. **`feat(acp): report context window usage as usage_update`** — the actual
-   feature. Written to be offerable upstream as-is. Upstream already has five
-   open/closed-unmerged PRs for this same gap (#75, #87, #97, #114, #119), so
-   Tandem carries its own until one of them lands.
+Upstream 0.0.34 added context-usage reporting (#97): `usage_update` on session
+new/load, model change, and before `agent_settled` resolves a prompt. The fork's
+original usage commit was dropped in favour of it.
 
-2. **`chore: build on prepare so git installs produce dist/`** — packaging only,
+1. **`chore: build on prepare so git installs produce dist/`** — packaging only,
    not for upstream. npm runs `prepare` (not `prepack`) when installing a git
    dependency; without it `npm install <git-url>#<ref>` yields a package with no
    `dist/`, and Tandem installs this fork straight from a pinned git SHA.
 
-3. **`fix: settle prompts after exhausted retries`** — resolves a prompt when
+2. **`fix: settle prompts after exhausted retries`** — resolves a prompt when
    Pi exhausts automatic retries without emitting a final `agent_settled` event.
 
-4. **`fix(acp): adaptively coalesce streaming deltas`** — batches adjacent text
-   and thought deltas before ACP delivery. The batching window grows when the
-   notification queue or observed delivery latency rises, preventing generation
-   from outrunning Tandem's consumer while keeping low-pressure latency small.
+3. **`fix(acp): adaptively coalesce streaming deltas`** (+ **`tune(acp): use
+   100ms delta coalescing window`**) — batches adjacent text and thought deltas
+   before ACP delivery. The batching window grows when the notification queue
+   or observed delivery latency rises, preventing generation from outrunning
+   Tandem's consumer while keeping low-pressure latency small. Offered upstream
+   as #134.
+
+4. **`feat(acp): publish context usage on assistant message_end`** — upstream
+   only reports usage at turn boundaries; this keeps Tandem's meter live
+   through long multi-step turns.
 
 ## Rebasing onto a new upstream release
 
@@ -49,10 +54,10 @@ tandem acp fork pi --rebased-onto <new-upstream-version>
 
 ## If the feature is upstreamed
 
-Check whether upstream now emits `usage_update` (`git log upstream/main --grep
-usage_update`, or look for `sessionUpdate: 'usage_update'` in
-`upstream/main:src/acp/session.ts`). If it does, retire the fork instead of
-rebasing it:
+Context usage is already upstream. The fork can be retired once upstream also
+settles prompts after exhausted retries (`auto_retry_end` with
+`success: false`), coalesces streaming deltas (#134), and publishes usage
+mid-turn (or Tandem accepts turn-boundary-only updates). Then:
 
 ```bash
 tandem acp upstream pi --constraint '^<version-that-has-it>'

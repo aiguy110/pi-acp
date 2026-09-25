@@ -503,9 +503,7 @@ export class PiAcpSession {
           update
         })
         const elapsed = Date.now() - startedAt
-        this.deliveryLatencyMs = this.deliveryLatencyMs
-          ? this.deliveryLatencyMs * 0.75 + elapsed * 0.25
-          : elapsed
+        this.deliveryLatencyMs = this.deliveryLatencyMs ? this.deliveryLatencyMs * 0.75 + elapsed * 0.25 : elapsed
       })
       .catch(() => {
         // Ignore notification errors (client may have gone away). We still want
@@ -538,10 +536,7 @@ export class PiAcpSession {
     })
   }
 
-  private emitDelta(
-    sessionUpdate: 'agent_message_chunk' | 'agent_thought_chunk',
-    text: string
-  ): void {
+  private emitDelta(sessionUpdate: 'agent_message_chunk' | 'agent_thought_chunk', text: string): void {
     if (!text) return
     if (this.deltaBuffer && this.deltaBuffer.sessionUpdate !== sessionUpdate) this.flushDeltaBuffer()
     if (!this.deltaBuffer) this.deltaBuffer = { sessionUpdate, text: '' }
@@ -591,11 +586,7 @@ export class PiAcpSession {
     // delivered before we resolve the ACP `session/prompt` request.
     await this.publishContextUsage()
 
-    const reason: StopReason = this.cancelRequested
-      ? 'cancelled'
-      : this.terminalRetryFailure
-        ? 'error'
-        : 'end_turn'
+    const reason: StopReason = this.cancelRequested ? 'cancelled' : this.terminalRetryFailure ? 'error' : 'end_turn'
     this.pendingTurn?.resolve(reason)
     this.pendingTurn = null
     this.inAgentLoop = false
@@ -1041,6 +1032,13 @@ export class PiAcpSession {
             text: 'Automatic compaction finished; context was summarized to continue the session.'
           } satisfies ContentBlock
         })
+        break
+      }
+
+      case 'message_end': {
+        // Publishing per assistant message (not only at `agent_settled`) keeps the
+        // client's context meter live through long multi-step turns.
+        if ((ev as any).message?.role === 'assistant') void this.publishContextUsage()
         break
       }
 
