@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "upstreamPackage": "pi-acp",
+  "upstreamVersion": "0.0.35",
+  "upstreamRepo": "https://github.com/svkozak/pi-acp",
+  "reason": "Reports context usage, settles exhausted retries, and adaptively coalesces streaming deltas to prevent ACP delivery backlogs",
+  "upstreamPrs": [
+    134
+  ]
+}
