@@ -13,6 +13,10 @@ It is tracked by Tandem's ACP fork-tracking system (`tandem acp` — see the
 
 ## Carried commits
 
+Current baseline: upstream **0.0.35** (session auto-titles / rename events; no
+overlap with the carried changes beyond a trivial conflict where delta
+coalescing renamed `emit` to `emitImmediate`).
+
 Upstream 0.0.34 added context-usage reporting (#97): `usage_update` on session
 new/load, model change, and before `agent_settled` resolves a prompt. The fork's
 original usage commit was dropped in favour of it.
